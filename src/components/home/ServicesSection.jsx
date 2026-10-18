@@ -1,5 +1,3 @@
-
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -169,6 +167,28 @@ const headlineWords = [
 ];
 
 /* --------------------------- HELPERS ---------------------------- */
+
+// Marquee component added here
+function Marquee({ reduce }) {
+  const items = useMemo(() => services.map((s) => s.name), []);
+  const row = [...items, ...items];
+  return (
+    <div className="relative mt-16 overflow-hidden border-y border-white/10 py-4 [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)]">
+      <motion.div
+        className="flex w-max gap-10 whitespace-nowrap text-sm text-white/45"
+        animate={reduce ? undefined : { x: ["0%", "-50%"] }}
+        transition={{ duration: 70, ease: "linear", repeat: Infinity }}
+      >
+        {row.map((name, i) => (
+          <span key={i} className="flex items-center gap-10">
+            {name}
+            <span className="h-1.5 w-1.5 rounded-full bg-[#D6FF63]/60" />
+          </span>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
 
 // Counts up from 0 when scrolled into view.
 function Counter({ to }) {
@@ -556,6 +576,9 @@ export default function ServicesSection() {
           </motion.div>
         </div>
 
+        {/* ---------- Marquee Added Here ---------- */}
+        <Marquee reduce={reduce} />
+
         {/* ---------- Category cards ---------- */}
         <div className="mt-14 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {categories.map((category, index) => (
@@ -798,61 +821,6 @@ export default function ServicesSection() {
             </div>
           )}
         </div>
-
-        {/* ---------- CTA ---------- */}
-        <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.98 }}
-          whileInView={{ opacity: 1, y: 0, scale: 1 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.7, ease: EASE }}
-          className="relative mt-20 flex flex-col justify-between gap-6 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#D6FF63]/[0.12] via-[#1D1E1A] to-[#1D1E1A] p-7 sm:p-10 lg:flex-row lg:items-center"
-        >
-          <motion.span
-            aria-hidden
-            animate={reduce ? undefined : { x: ["-120%", "420%"] }}
-            transition={{
-              duration: 6,
-              repeat: Infinity,
-              repeatDelay: 3,
-              ease: "easeInOut",
-            }}
-            className="pointer-events-none absolute inset-y-0 w-1/4 -skew-x-12 bg-gradient-to-r from-transparent via-[#D6FF63]/[0.08] to-transparent"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#D6FF63]/15 blur-3xl"
-          />
-
-          <div className="relative">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#D6FF63]">
-              Have a project in mind?
-            </p>
-            <h3 className="display-font mt-3 text-2xl sm:text-4xl">
-              Let's discuss your space.
-            </h3>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-white/55">
-              Tell us what you need, and enquire about the right service for
-              your property.
-            </p>
-          </div>
-
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.96 }}
-            className="relative w-fit shrink-0"
-          >
-            <Link
-              to="/contact"
-              className="group inline-flex items-center gap-3 rounded-full bg-[#D6FF63] px-7 py-4 text-sm font-semibold text-[#151614] shadow-[0_0_40px_-8px_rgba(214,255,99,0.6)] transition-colors hover:bg-white"
-            >
-              Get in touch
-              <ArrowUpRight
-                size={18}
-                className="transition-transform group-hover:-translate-y-1 group-hover:translate-x-1"
-              />
-            </Link>
-          </motion.div>
-        </motion.div>
       </div>
     </section>
   );
