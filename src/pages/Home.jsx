@@ -1,9 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   motion,
-  animate,
-  useInView,
+  useMotionTemplate,
   useMotionValue,
   useReducedMotion,
   useScroll,
@@ -22,9 +21,11 @@ import {
   FinalCTA,
 } from "../components/home/HomeSections";
 
+const EASE = [0.22, 1, 0.36, 1];
+
 /* ------------------------- SMALL HELPERS ------------------------- */
 
-// Thin green bar at the top showing scroll progress.
+// Thin lime bar at the top showing scroll progress.
 function ScrollProgress() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 28 });
@@ -68,31 +69,6 @@ function Magnetic({ children, strength = 0.3 }) {
   );
 }
 
-// Counts from 0 to `to` when it enters the screen.
-function Counter({ to, suffix = "" }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true });
-  const reduce = useReducedMotion();
-
-  useEffect(() => {
-    if (!inView || !ref.current) return;
-    if (reduce) {
-      ref.current.textContent = to + suffix;
-      return;
-    }
-    const controls = animate(0, to, {
-      duration: 1.8,
-      ease: "easeOut",
-      onUpdate: (v) => {
-        if (ref.current) ref.current.textContent = Math.round(v) + suffix;
-      },
-    });
-    return () => controls.stop();
-  }, [inView, to, suffix, reduce]);
-
-  return <span ref={ref}>0{suffix}</span>;
-}
-
 // Slides each word up from behind a mask.
 function RevealWords({ words, startDelay = 0 }) {
   return (
@@ -106,7 +82,7 @@ function RevealWords({ words, startDelay = 0 }) {
               transition={{
                 duration: 0.9,
                 delay: startDelay + i * 0.1,
-                ease: [0.22, 1, 0.36, 1],
+                ease: EASE,
               }}
               className={`inline-block ${className}`}
             >
@@ -122,20 +98,14 @@ function RevealWords({ words, startDelay = 0 }) {
 
 /* ----------------------------- DATA ----------------------------- */
 
-// TODO: replace with your real numbers.
-const stats = [
-  { value: 500, suffix: "+", label: "Projects completed" },
-  { value: 10, suffix: "+", label: "Years of experience" },
-  { value: 45, suffix: "", label: "Services offered" },
-  { value: 100, suffix: "%", label: "Focus on finish quality" },
-];
-
 const headlineWords = [
   { text: "Make" },
   { text: "room", br: true },
   { text: "for" },
-  { text: "better.", className: "text-[#D6FF63]" },
+  { text: "better.", className: "shimmer-text" },
 ];
+
+const paintChips = ["#E6C9A8", "#8FBFA8", "#E39AB4", "#7FB2E5"];
 
 /* ------------------------------ PAGE ----------------------------- */
 
@@ -160,33 +130,95 @@ export default function Home() {
   );
   const contentOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
+  // Cursor spotlight
+  const sx = useMotionValue(0);
+  const sy = useMotionValue(0);
+  const spotlight = useMotionTemplate`radial-gradient(520px circle at ${sx}px ${sy}px, rgba(214,255,99,0.10), transparent 70%)`;
+  function onHeroMove(e) {
+    if (reduce) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    sx.set(e.clientX - r.left);
+    sy.set(e.clientY - r.top);
+  }
+
   return (
     <main className="overflow-x-clip">
+      <style>{`
+        @keyframes shimmer-move { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+        .shimmer-text {
+          background-image: linear-gradient(90deg, #D6FF63 0%, #F4FFD0 25%, #D6FF63 50%, #B7E83F 75%, #D6FF63 100%);
+          background-size: 200% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: shimmer-move 5s linear infinite;
+        }
+        @media (prefers-reduced-motion: reduce) { .shimmer-text { animation: none; } }
+      `}</style>
+
       <ScrollProgress />
 
       {/* HERO */}
       <section
         ref={heroRef}
+        onMouseMove={onHeroMove}
         className="relative flex min-h-[780px] items-center overflow-hidden px-5 py-24 sm:min-h-[820px] sm:px-10 lg:min-h-[calc(100svh-80px)] lg:px-16"
       >
-        {/* Background: slow zoom-out + parallax */}
+        {/* Background image: revealed like a paint-roller wipe, then parallax */}
         <motion.div
           style={{ y: imageY }}
           className="absolute inset-x-0 -top-[10%] h-[120%]"
         >
-          <motion.img
-            src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=2200&q=90"
-            alt="Elegant contemporary living space"
-            fetchPriority="high"
-            initial={{ scale: 1.18 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 2.2, ease: [0.22, 1, 0.36, 1] }}
-            className="h-full w-full object-cover object-center"
-          />
-          <div className="absolute inset-0 bg-[#151614]/55" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#151614] via-[#151614]/75 to-[#151614]/15" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#151614] via-transparent to-[#151614]/20" />
+          <motion.div
+            initial={{ clipPath: "inset(0 100% 0 0)" }}
+            animate={{ clipPath: "inset(0 0% 0 0)" }}
+            transition={{ duration: 1.4, ease: EASE }}
+            className="absolute inset-0"
+          >
+            <motion.img
+              src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=2200&q=90"
+              alt="Elegant contemporary living space"
+              fetchPriority="high"
+              initial={{ scale: 1.25 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 2.4, ease: EASE }}
+              className="h-full w-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-[#151614]/55" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#151614] via-[#151614]/75 to-[#151614]/15" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#151614] via-transparent to-[#151614]/20" />
+          </motion.div>
         </motion.div>
+
+        {/* Dot grid */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1px)",
+            backgroundSize: "26px 26px",
+            WebkitMaskImage:
+              "radial-gradient(ellipse at 25% 45%, #000 15%, transparent 70%)",
+            maskImage:
+              "radial-gradient(ellipse at 25% 45%, #000 15%, transparent 70%)",
+          }}
+        />
+
+        {/* Cursor spotlight */}
+        <motion.div
+          aria-hidden
+          style={{ background: spotlight }}
+          className="pointer-events-none absolute inset-0"
+        />
+
+        {/* Floating glow */}
+        <motion.div
+          aria-hidden
+          animate={reduce ? undefined : { y: [0, 40, 0], scale: [1, 1.15, 1] }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          className="pointer-events-none absolute -left-24 bottom-0 h-80 w-80 rounded-full bg-[#D6FF63]/[0.08] blur-[110px]"
+        />
 
         <motion.div
           style={{ y: contentY, opacity: contentOpacity }}
@@ -210,7 +242,7 @@ export default function Home() {
             </motion.div>
 
             {/* Headline */}
-            <h1 className="display-font text-5xl font-medium leading-[1.04] tracking-[-0.06em] sm:text-7xl lg:text-[100px]">
+            <h1 className="display-font text-[2.9rem] font-medium leading-[1.04] tracking-[-0.06em] sm:text-7xl lg:text-[100px]">
               <RevealWords words={headlineWords} startDelay={0.3} />
             </h1>
 
@@ -234,7 +266,7 @@ export default function Home() {
               <Magnetic>
                 <Link
                   to="/contact"
-                  className="group inline-flex items-center gap-3 rounded-full bg-[#D6FF63] px-6 py-4 text-sm font-semibold text-[#151614] transition-colors hover:bg-white"
+                  className="group inline-flex items-center gap-3 rounded-full bg-[#D6FF63] px-6 py-4 text-sm font-semibold text-[#151614] shadow-[0_0_40px_-8px_rgba(214,255,99,0.6)] transition-colors hover:bg-white"
                 >
                   Discuss your project
                   <ArrowUpRight
@@ -260,8 +292,17 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.3, duration: 0.8 }}
-            className="mt-20 flex flex-col justify-between gap-6 border-t border-white/20 pt-5 sm:mt-28 sm:flex-row sm:items-end"
+            className="relative mt-20 flex flex-col justify-between gap-6 pt-5 sm:mt-28 sm:flex-row sm:items-end"
           >
+            {/* line draws from left */}
+            <motion.span
+              aria-hidden
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 1.2, delay: 1.3, ease: EASE }}
+              className="absolute inset-x-0 top-0 h-px origin-left bg-white/20"
+            />
+
             <p className="max-w-xs text-xs leading-6 text-white/55 sm:text-sm">
               The right finish changes more than a room.
               <br />
@@ -280,7 +321,7 @@ export default function Home() {
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/25 group-hover:border-[#D6FF63]"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/25 transition-colors group-hover:border-[#D6FF63]"
               >
                 <ArrowDown size={15} />
               </motion.span>
@@ -288,11 +329,45 @@ export default function Home() {
           </motion.div>
         </motion.div>
 
+        {/* Floating paint chips (desktop only, decorative) */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-10 top-[26%] hidden flex-col gap-3 xl:flex"
+        >
+          {paintChips.map((c, i) => (
+            <motion.span
+              key={c}
+              initial={{ opacity: 0, x: 30 }}
+              animate={
+                reduce
+                  ? { opacity: 1, x: 0 }
+                  : { opacity: 1, x: 0, y: [0, -7, 0] }
+              }
+              transition={
+                reduce
+                  ? { delay: 1.4 + i * 0.1 }
+                  : {
+                      opacity: { delay: 1.4 + i * 0.1, duration: 0.5 },
+                      x: { delay: 1.4 + i * 0.1, duration: 0.5 },
+                      y: {
+                        duration: 4 + i,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: i * 0.4,
+                      },
+                    }
+              }
+              className="h-12 w-12 rounded-2xl border-2 border-white/20 shadow-xl"
+              style={{ background: c }}
+            />
+          ))}
+        </div>
+
         {/* Floating glass card (desktop only) */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 1.5, duration: 0.7 }}
+          transition={{ delay: 1.6, duration: 0.7 }}
           className="pointer-events-none absolute bottom-28 right-10 hidden xl:block"
         >
           <motion.div
@@ -313,52 +388,47 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* INTRO STRIP with animated stats */}
-      <section className="border-b border-white/10 px-5 py-10 sm:px-10 lg:px-16">
-        <div className="mx-auto max-w-7xl">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <motion.p
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="text-xs uppercase tracking-[0.2em] text-white/45"
-            >
-              A considered approach to every surface
-            </motion.p>
+      {/* INTRO STRIP */}
+      <section className="relative px-5 py-8 sm:px-10 lg:px-16">
+        <motion.span
+          aria-hidden
+          initial={{ scaleX: 0 }}
+          whileInView={{ scaleX: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.2, ease: EASE }}
+          className="absolute inset-x-0 bottom-0 h-px origin-left bg-white/10"
+        />
 
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <motion.p
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease: EASE }}
+            className="text-xs uppercase tracking-[0.2em] text-white/45"
+          >
+            A considered approach to every surface
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
+            className="w-fit"
+          >
             <Link
               to="/about"
-              className="group inline-flex items-center gap-2 text-sm text-[#D6FF63]"
+              className="group relative inline-flex items-center gap-2 pb-1 text-sm text-[#D6FF63]"
             >
               Meet Elite Finish
               <ArrowUpRight
                 size={16}
                 className="transition-transform group-hover:-translate-y-1 group-hover:translate-x-1"
               />
+              <span className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-[#D6FF63] transition-transform duration-500 group-hover:scale-x-100" />
             </Link>
-          </div>
-
-          <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {stats.map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.4 }}
-                transition={{ duration: 0.55, delay: i * 0.1 }}
-                whileHover={{ y: -4 }}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-[#D6FF63]/40"
-              >
-                <div className="display-font text-4xl text-[#D6FF63] sm:text-5xl">
-                  <Counter to={stat.value} suffix={stat.suffix} />
-                </div>
-                <p className="mt-2 text-xs leading-5 text-white/50 sm:text-sm">
-                  {stat.label}
-                </p>
-              </motion.div>
-            ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 

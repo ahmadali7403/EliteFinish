@@ -6,6 +6,8 @@ import {
   LayoutGroup,
   animate,
   useInView,
+  useMotionTemplate,
+  useMotionValue,
   useReducedMotion,
   useScroll,
   useTransform,
@@ -15,6 +17,7 @@ import { ArrowRight, Search, CheckCircle2, Paintbrush, X } from "lucide-react";
 /* ----------------------------- DATA ----------------------------- */
 
 const ALL = "All Services";
+const EASE = [0.22, 1, 0.36, 1];
 
 const serviceCategories = [
   {
@@ -46,6 +49,19 @@ const serviceCategories = [
     description: "Refresh worn surfaces and restore their appearance.",
   },
 ];
+
+// Each category gets its own "paint colour".
+const swatchColors = {
+  "Interior Painting": "#E6C9A8",
+  "Exterior Painting": "#8FBFA8",
+  "Surface Preparation": "#C9C6BC",
+  "Decorative Finishes": "#E39AB4",
+  "Protection & Waterproofing": "#7FB2E5",
+  "Repainting & Maintenance": "#D6FF63",
+};
+
+const rainbowDot =
+  "conic-gradient(#E6C9A8, #8FBFA8, #E39AB4, #7FB2E5, #D6FF63, #E6C9A8)";
 
 const group = (category, names) => names.map((name) => ({ name, category }));
 
@@ -121,16 +137,13 @@ const categoryCounts = Object.fromEntries(
 const headlineWords = [
   { text: "Every" },
   { text: "surface.", br: true },
-  { text: "A", className: "text-[#D6FF63]" },
-  { text: "better", className: "text-[#D6FF63]" },
-  { text: "finish.", className: "text-[#D6FF63]" },
+  { text: "A", className: "shimmer-text" },
+  { text: "better", className: "shimmer-text" },
+  { text: "finish.", className: "shimmer-text" },
 ];
-
-const EASE = [0.22, 1, 0.36, 1];
 
 /* --------------------------- HELPERS ---------------------------- */
 
-// Counts up from 0 when it scrolls into view.
 function Counter({ to, pad = 0 }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true });
@@ -157,13 +170,12 @@ function Counter({ to, pad = 0 }) {
   return <span ref={ref}>{format(0)}</span>;
 }
 
-// Slides each word up from behind a mask.
 function RevealWords({ words, startDelay = 0 }) {
   return (
     <>
       {words.map(({ text, className = "", br }, i) => (
         <span key={i}>
-          <span className="inline-block overflow-hidden pb-1 align-bottom">
+          <span className="inline-block overflow-hidden pb-2 align-bottom">
             <motion.span
               initial={{ y: "115%", rotate: 3 }}
               animate={{ y: 0, rotate: 0 }}
@@ -184,7 +196,6 @@ function RevealWords({ words, startDelay = 0 }) {
   );
 }
 
-// Highlights the matching part of a search.
 function Highlight({ text, query }) {
   if (!query) return text;
   const i = text.toLowerCase().indexOf(query.toLowerCase());
@@ -200,13 +211,97 @@ function Highlight({ text, query }) {
   );
 }
 
+// Paint-chip style service card with a cursor-following glow.
+function ServiceCard({ service, index, query }) {
+  const color = swatchColors[service.category];
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const glow = useMotionTemplate`radial-gradient(280px circle at ${mx}px ${my}px, rgba(214,255,99,0.13), transparent 70%)`;
+
+  function onMove(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    mx.set(e.clientX - r.left);
+    my.set(e.clientY - r.top);
+  }
+
+  return (
+    <motion.article
+      layout
+      onMouseMove={onMove}
+      initial={{ opacity: 0, y: 24, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.94 }}
+      transition={{
+        duration: 0.35,
+        delay: Math.min(index, 8) * 0.04,
+        ease: EASE,
+      }}
+      whileHover={{ y: -6 }}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-colors duration-300 hover:border-white/25"
+    >
+      {/* Paint swatch */}
+      <div
+        className="relative h-16 overflow-hidden sm:h-[72px]"
+        style={{ background: color }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-white/35 via-transparent to-black/15" />
+        <span
+          aria-hidden
+          className="absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-white/30 blur-md transition-transform duration-700 group-hover:translate-x-[420%]"
+        />
+        <span className="absolute right-4 top-3 text-xs font-semibold tabular-nums text-[#151614]/60">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+      </div>
+
+      {/* Glow */}
+      <motion.div
+        aria-hidden
+        style={{ background: glow }}
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+      />
+
+      <div className="relative flex flex-1 flex-col px-5 pb-5 pt-8 sm:px-6 sm:pb-6">
+        {/* Icon sits on the swatch edge */}
+        <div
+          className="absolute -top-5 left-5 flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-[#151614] transition duration-500 group-hover:-rotate-12 group-hover:scale-110 sm:left-6"
+          style={{ color }}
+        >
+          <Paintbrush size={19} strokeWidth={1.7} />
+        </div>
+
+        <p className="text-base font-medium leading-6 text-white/95">
+          <Highlight text={service.name} query={query} />
+        </p>
+        <p className="mt-2 flex items-center gap-2 text-xs text-white/45">
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ background: color }}
+          />
+          {service.category}
+        </p>
+
+        <Link
+          to={`/contact?service=${encodeURIComponent(service.name)}`}
+          className="mt-6 inline-flex w-fit items-center gap-2 text-sm text-white/65 transition-colors hover:text-[#D6FF63]"
+        >
+          Enquire about service
+          <ArrowRight
+            size={15}
+            className="transition-transform duration-300 group-hover:translate-x-1"
+          />
+        </Link>
+      </div>
+    </motion.article>
+  );
+}
+
 /* ----------------------------- PAGE ----------------------------- */
 
 export default function Services() {
   const reduce = useReducedMotion();
   const [activeCategory, setActiveCategory] = useState(ALL);
   const [search, setSearch] = useState("");
-
   const query = search.trim();
 
   const filteredServices = useMemo(() => {
@@ -214,8 +309,7 @@ export default function Services() {
     return services.filter((service) => {
       const matchesCategory =
         activeCategory === ALL || service.category === activeCategory;
-      const matchesSearch = service.name.toLowerCase().includes(q);
-      return matchesCategory && matchesSearch;
+      return matchesCategory && service.name.toLowerCase().includes(q);
     });
   }, [activeCategory, query]);
 
@@ -227,7 +321,18 @@ export default function Services() {
     setActiveCategory(ALL);
   }
 
-  // Parallax for the hero image
+  // Hero: cursor spotlight
+  const hx = useMotionValue(0);
+  const hy = useMotionValue(0);
+  const heroGlow = useMotionTemplate`radial-gradient(520px circle at ${hx}px ${hy}px, rgba(214,255,99,0.10), transparent 70%)`;
+  function onHeroMove(e) {
+    if (reduce) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    hx.set(e.clientX - r.left);
+    hy.set(e.clientY - r.top);
+  }
+
+  // Hero: image parallax
   const imageRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: imageRef,
@@ -236,13 +341,50 @@ export default function Services() {
   const imageY = useTransform(
     scrollYProgress,
     [0, 1],
-    reduce ? ["0%", "0%"] : ["-8%", "8%"],
+    reduce ? ["0%", "0%"] : ["-6%", "6%"],
   );
 
   return (
     <main className="min-h-screen overflow-x-clip bg-[#151614] text-[#F3F0E8]">
+      <style>{`
+        @keyframes shimmer-move { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+        .shimmer-text {
+          background-image: linear-gradient(90deg, #D6FF63 0%, #F4FFD0 25%, #D6FF63 50%, #B7E83F 75%, #D6FF63 100%);
+          background-size: 200% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: shimmer-move 5s linear infinite;
+        }
+        @media (prefers-reduced-motion: reduce) { .shimmer-text { animation: none; } }
+      `}</style>
+
       {/* ============================ HERO ============================ */}
-      <section className="relative overflow-hidden border-b border-white/10">
+      <section
+        onMouseMove={onHeroMove}
+        className="relative overflow-hidden border-b border-white/10"
+      >
+        {/* dot grid */}
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-70"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(255,255,255,0.09) 1px, transparent 1px)",
+            backgroundSize: "26px 26px",
+            WebkitMaskImage:
+              "radial-gradient(ellipse at 30% 40%, #000 20%, transparent 75%)",
+            maskImage:
+              "radial-gradient(ellipse at 30% 40%, #000 20%, transparent 75%)",
+          }}
+        />
+        {/* cursor spotlight */}
+        <motion.div
+          aria-hidden
+          style={{ background: heroGlow }}
+          className="pointer-events-none absolute inset-0"
+        />
+        {/* floating glows */}
         <motion.div
           aria-hidden
           animate={reduce ? undefined : { y: [0, 40, 0], scale: [1, 1.15, 1] }}
@@ -256,7 +398,7 @@ export default function Services() {
           className="absolute -bottom-32 -left-24 h-72 w-72 rounded-full bg-[#D6FF63]/[0.06] blur-[110px]"
         />
 
-        <div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 md:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:py-28">
+        <div className="relative mx-auto grid max-w-7xl gap-14 px-5 py-16 sm:px-8 md:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:py-28">
           {/* Text */}
           <div>
             <motion.p
@@ -274,7 +416,7 @@ export default function Services() {
               What We Do
             </motion.p>
 
-            <h1 className="max-w-3xl text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+            <h1 className="max-w-3xl text-[2.6rem] font-semibold leading-[1.06] tracking-tight sm:text-6xl md:text-7xl lg:text-[5.25rem]">
               <RevealWords words={headlineWords} startDelay={0.25} />
             </h1>
 
@@ -298,7 +440,7 @@ export default function Services() {
                 href="#service-directory"
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.97 }}
-                className="group inline-flex items-center gap-2 rounded-full bg-[#D6FF63] px-6 py-3.5 text-sm font-semibold text-[#151614] transition-colors hover:bg-white"
+                className="group inline-flex items-center gap-2 rounded-full bg-[#D6FF63] px-6 py-3.5 text-sm font-semibold text-[#151614] shadow-[0_0_40px_-8px_rgba(214,255,99,0.6)] transition-colors hover:bg-white"
               >
                 Explore Services
                 <ArrowRight
@@ -313,7 +455,7 @@ export default function Services() {
               >
                 <Link
                   to="/contact"
-                  className="inline-flex rounded-full border border-white/20 px-6 py-3.5 text-sm font-medium transition-colors hover:border-[#D6FF63] hover:text-[#D6FF63]"
+                  className="inline-flex rounded-full border border-white/20 bg-white/[0.03] px-6 py-3.5 text-sm font-medium backdrop-blur transition-colors hover:border-[#D6FF63] hover:text-[#D6FF63]"
                 >
                   Get a Quote
                 </Link>
@@ -322,61 +464,107 @@ export default function Services() {
 
             {/* Stats */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 1.15 }}
-              className="mt-10 grid grid-cols-3 gap-4 border-t border-white/10 pt-6 sm:flex sm:flex-wrap sm:gap-x-10"
+              className="mt-10 grid max-w-lg grid-cols-3 gap-3"
             >
-              <div>
-                <p className="text-2xl font-semibold text-[#D6FF63] sm:text-3xl">
-                  <Counter to={services.length} />
-                </p>
-                <p className="mt-1 text-xs text-white/50">Listed services</p>
-              </div>
-              <div>
-                <p className="text-2xl font-semibold sm:text-3xl">
-                  <Counter to={serviceCategories.length - 1} pad={2} />
-                </p>
-                <p className="mt-1 text-xs text-white/50">Service categories</p>
-              </div>
-              <div>
-                <p className="text-2xl font-semibold sm:text-3xl">
-                  <Counter to={1} pad={2} />
-                </p>
-                <p className="mt-1 text-xs text-white/50">
-                  Clear starting point
-                </p>
-              </div>
+              {[
+                {
+                  to: services.length,
+                  pad: 0,
+                  label: "Listed services",
+                  accent: true,
+                },
+                {
+                  to: serviceCategories.length - 1,
+                  pad: 2,
+                  label: "Service categories",
+                },
+                { to: 1, pad: 2, label: "Clear starting point" },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 backdrop-blur transition-colors hover:border-[#D6FF63]/40"
+                >
+                  <p
+                    className={`text-2xl font-semibold sm:text-3xl ${s.accent ? "text-[#D6FF63]" : ""}`}
+                  >
+                    <Counter to={s.to} pad={s.pad} />
+                  </p>
+                  <p className="mt-1 text-[11px] leading-4 text-white/50 sm:text-xs">
+                    {s.label}
+                  </p>
+                </div>
+              ))}
             </motion.div>
           </div>
 
-          {/* Image */}
-          <motion.div
+          {/* Arch image */}
+          <div
             ref={imageRef}
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.3, ease: EASE }}
-            className="relative"
+            className="relative mx-auto w-full max-w-md lg:max-w-none"
           >
+            {/* outline arch */}
             <motion.div
               aria-hidden
-              initial={{ opacity: 0, scale: 0.94 }}
+              initial={{ opacity: 0, scale: 0.92 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 1, delay: 0.7 }}
-              className="absolute -inset-2 rounded-[2rem] border border-[#D6FF63]/20 sm:-inset-3"
+              transition={{ duration: 1, delay: 0.6 }}
+              className="absolute -inset-2 rounded-t-[11rem] rounded-b-[2rem] border border-[#D6FF63]/25 sm:-inset-3 sm:rounded-t-[15rem]"
             />
-            <div className="relative h-[320px] overflow-hidden rounded-[1.5rem] sm:h-[440px]">
+
+            {/* Image revealed like a paint roller wipe */}
+            <motion.div
+              initial={{ clipPath: "inset(100% 0 0 0)" }}
+              animate={{ clipPath: "inset(0% 0 0 0)" }}
+              transition={{ duration: 1.3, delay: 0.3, ease: EASE }}
+              className="relative h-[380px] overflow-hidden rounded-t-[10rem] rounded-b-3xl sm:h-[500px] sm:rounded-t-[14rem]"
+            >
               <motion.img
                 src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1100&q=85"
                 alt="Modern interior with refined wall finishes"
-                initial={{ scale: 1.2 }}
-                animate={{ scale: 1.08 }}
+                initial={{ scale: 1.35 }}
+                animate={{ scale: 1.15 }}
                 transition={{ duration: 2, ease: EASE }}
                 style={{ y: imageY }}
                 className="absolute inset-0 h-full w-full object-cover"
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#151614]/70 via-transparent to-transparent" />
+            </motion.div>
+
+            {/* Paint chips floating on the left */}
+            <div className="absolute -left-1 top-1/3 flex flex-col gap-2 sm:-left-5">
+              {["#E6C9A8", "#8FBFA8", "#E39AB4", "#7FB2E5"].map((c, i) => (
+                <motion.span
+                  key={c}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={
+                    reduce
+                      ? { opacity: 1, x: 0 }
+                      : { opacity: 1, x: 0, y: [0, -6, 0] }
+                  }
+                  transition={
+                    reduce
+                      ? { delay: 1.2 + i * 0.1 }
+                      : {
+                          opacity: { delay: 1.2 + i * 0.1, duration: 0.5 },
+                          x: { delay: 1.2 + i * 0.1, duration: 0.5 },
+                          y: {
+                            duration: 4 + i,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay: i * 0.4,
+                          },
+                        }
+                  }
+                  className="h-9 w-9 rounded-xl border-2 border-[#151614] shadow-lg sm:h-11 sm:w-11"
+                  style={{ background: c }}
+                />
+              ))}
             </div>
 
+            {/* Glass card */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={
@@ -384,18 +572,18 @@ export default function Services() {
               }
               transition={
                 reduce
-                  ? { duration: 0.6, delay: 1.2 }
+                  ? { duration: 0.6, delay: 1.3 }
                   : {
-                      opacity: { duration: 0.6, delay: 1.2 },
+                      opacity: { duration: 0.6, delay: 1.3 },
                       y: {
                         duration: 5,
-                        delay: 1.8,
+                        delay: 1.9,
                         repeat: Infinity,
                         ease: "easeInOut",
                       },
                     }
               }
-              className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/15 bg-[#151614]/80 p-4 backdrop-blur-xl sm:bottom-7 sm:left-7 sm:right-7 sm:p-5"
+              className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/15 bg-[#151614]/75 p-4 backdrop-blur-xl sm:bottom-7 sm:left-8 sm:right-8 sm:p-5"
             >
               <p className="text-xs uppercase tracking-[0.2em] text-[#D6FF63]">
                 The Elite Finish Approach
@@ -404,7 +592,7 @@ export default function Services() {
                 Preparation first. Quality in every detail.
               </p>
             </motion.div>
-          </motion.div>
+          </div>
         </div>
       </section>
 
@@ -424,11 +612,9 @@ export default function Services() {
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#D6FF63]">
               Service Directory
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">
               Find the right service.
             </h2>
-
-            {/* Description changes smoothly with the category */}
             <div className="relative mt-3 min-h-[3rem] max-w-xl">
               <AnimatePresence mode="wait" initial={false}>
                 <motion.p
@@ -477,7 +663,7 @@ export default function Services() {
           </div>
         </motion.div>
 
-        {/* Category chips: wrap on small screens, sliding active pill */}
+        {/* Category chips */}
         <LayoutGroup id="service-chips">
           <div className="mt-8 flex flex-wrap gap-2">
             {serviceCategories.map((category) => {
@@ -487,7 +673,7 @@ export default function Services() {
                   key={category.name}
                   type="button"
                   onClick={() => setActiveCategory(category.name)}
-                  className={`relative rounded-full border px-4 py-2.5 text-xs transition-colors duration-200 sm:text-sm ${
+                  className={`relative flex items-center gap-2 rounded-full border px-4 py-2.5 text-xs transition-colors duration-200 sm:text-sm ${
                     active
                       ? "border-transparent font-medium text-[#151614]"
                       : "border-white/15 text-white/65 hover:border-white/40 hover:text-white"
@@ -504,6 +690,12 @@ export default function Services() {
                       className="absolute inset-0 rounded-full bg-[#D6FF63]"
                     />
                   )}
+                  <span
+                    className="relative z-10 h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/20"
+                    style={{
+                      background: swatchColors[category.name] || rainbowDot,
+                    }}
+                  />
                   <span className="relative z-10">
                     {category.name}{" "}
                     <span className={active ? "opacity-60" : "opacity-40"}>
@@ -551,61 +743,19 @@ export default function Services() {
           </AnimatePresence>
         </div>
 
-        {/* Service cards */}
+        {/* Cards */}
         <motion.div
           layout
-          className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
           <AnimatePresence mode="popLayout">
             {filteredServices.map((service, index) => (
-              <motion.article
-                layout
+              <ServiceCard
                 key={service.name}
-                initial={{ opacity: 0, y: 20, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.94 }}
-                transition={{
-                  duration: 0.3,
-                  delay: Math.min(index, 8) * 0.035,
-                }}
-                whileHover={{ y: -5 }}
-                className="group relative flex min-h-40 flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] p-5 transition-colors duration-300 hover:border-[#D6FF63]/40 hover:bg-white/[0.05] sm:p-6"
-              >
-                {/* hover glow */}
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#D6FF63]/0 blur-2xl transition-colors duration-500 group-hover:bg-[#D6FF63]/15"
-                />
-
-                <div className="relative flex items-start justify-between gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[#D6FF63] transition duration-500 group-hover:-rotate-12 group-hover:scale-110 group-hover:border-[#D6FF63]/40">
-                    <Paintbrush size={19} strokeWidth={1.6} />
-                  </div>
-                  <span className="text-xs tabular-nums text-white/30">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                </div>
-
-                <div className="relative mt-7">
-                  <p className="text-base font-medium leading-6 transition-colors group-hover:text-[#D6FF63]">
-                    <Highlight text={service.name} query={query} />
-                  </p>
-                  <p className="mt-2 text-xs text-white/40">
-                    {service.category}
-                  </p>
-                </div>
-
-                <Link
-                  to={`/contact?service=${encodeURIComponent(service.name)}`}
-                  className="relative mt-5 inline-flex w-fit items-center gap-2 text-sm text-white/65 transition-colors hover:text-[#D6FF63]"
-                >
-                  Enquire about service
-                  <ArrowRight
-                    size={15}
-                    className="transition-transform duration-300 group-hover:translate-x-1"
-                  />
-                </Link>
-              </motion.article>
+                service={service}
+                index={index}
+                query={query}
+              />
             ))}
           </AnimatePresence>
         </motion.div>
@@ -643,55 +793,61 @@ export default function Services() {
       </section>
 
       {/* ======================== PROCESS BANNER ======================== */}
-      <section className="relative overflow-hidden border-y border-white/10 bg-white/[0.025]">
-        <motion.span
-          aria-hidden
-          animate={reduce ? undefined : { x: ["-120%", "420%"] }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            repeatDelay: 3,
-            ease: "easeInOut",
-          }}
-          className="pointer-events-none absolute inset-y-0 w-1/4 -skew-x-12 bg-gradient-to-r from-transparent via-[#D6FF63]/[0.06] to-transparent"
-        />
-
+      <section className="mx-auto max-w-7xl px-5 sm:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 40, scale: 0.98 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
           viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.65 }}
-          className="relative mx-auto flex max-w-7xl flex-col gap-6 px-5 py-12 sm:px-8 md:flex-row md:items-center md:justify-between"
+          transition={{ duration: 0.7, ease: EASE }}
+          className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#D6FF63]/[0.12] via-white/[0.03] to-transparent p-7 sm:p-12"
         >
-          <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#D6FF63]">
-              Have a project in mind?
-            </p>
-            <h2 className="mt-3 text-2xl font-semibold sm:text-3xl">
-              Let's discuss your space.
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-white/55">
-              Tell us what you need, and we can discuss the next steps for your
-              painting project.
-            </p>
-          </div>
+          <motion.span
+            aria-hidden
+            animate={reduce ? undefined : { x: ["-120%", "420%"] }}
+            transition={{
+              duration: 6,
+              repeat: Infinity,
+              repeatDelay: 3,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute inset-y-0 w-1/4 -skew-x-12 bg-gradient-to-r from-transparent via-[#D6FF63]/[0.08] to-transparent"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#D6FF63]/15 blur-3xl"
+          />
 
-          <motion.div
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.97 }}
-            className="shrink-0"
-          >
-            <Link
-              to="/contact"
-              className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#D6FF63] px-6 py-3.5 text-sm font-semibold text-[#151614] transition-colors hover:bg-white md:w-auto"
+          <div className="relative flex flex-col gap-7 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#D6FF63]">
+                Have a project in mind?
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">
+                Let's discuss your space.
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-white/60">
+                Tell us what you need, and we can discuss the next steps for
+                your painting project.
+              </p>
+            </div>
+
+            <motion.div
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.97 }}
+              className="shrink-0"
             >
-              Discuss Your Project
-              <ArrowRight
-                size={17}
-                className="transition-transform group-hover:translate-x-1"
-              />
-            </Link>
-          </motion.div>
+              <Link
+                to="/contact"
+                className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#D6FF63] px-7 py-4 text-sm font-semibold text-[#151614] shadow-[0_0_40px_-8px_rgba(214,255,99,0.6)] transition-colors hover:bg-white md:w-auto"
+              >
+                Discuss Your Project
+                <ArrowRight
+                  size={17}
+                  className="transition-transform group-hover:translate-x-1"
+                />
+              </Link>
+            </motion.div>
+          </div>
         </motion.div>
       </section>
 
@@ -701,7 +857,7 @@ export default function Services() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6 }}
-        className="mx-auto flex max-w-7xl items-start gap-3 px-5 py-8 text-sm leading-6 text-white/45 sm:px-8"
+        className="mx-auto flex max-w-7xl items-start gap-3 px-5 py-10 text-sm leading-6 text-white/45 sm:px-8"
       >
         <CheckCircle2 size={18} className="mt-1 shrink-0 text-[#D6FF63]" />
         <p>
