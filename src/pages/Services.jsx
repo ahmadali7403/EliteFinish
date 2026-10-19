@@ -522,7 +522,7 @@ export default function Services() {
               className="relative h-[380px] overflow-hidden rounded-t-[10rem] rounded-b-3xl sm:h-[500px] sm:rounded-t-[14rem]"
             >
               <motion.img
-                src="/public/servicesHero.jpeg"
+                src="/public/images//services-hero.jpeg"
                 alt="Modern interior with refined wall finishes"
                 initial={{ scale: 1.35 }}
                 animate={{ scale: 1.15 }}
